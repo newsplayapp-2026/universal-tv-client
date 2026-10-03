@@ -102,3 +102,94 @@ export async function getClientLiveUsers(token) {
 
   return data;
 }
+
+export async function getClientAds(token) {
+  const response = await fetch(`${API_BASE_URL}/api/client/ads`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to load advertisements");
+  }
+
+  return data;
+}
+
+export async function createClientAd(token, adData) {
+  const response = await fetch(`${API_BASE_URL}/api/client/ads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(adData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to create advertisement");
+  }
+
+  return data;
+}
+
+export async function updateClientAd(token, adId, adData) {
+  const response = await fetch(`${API_BASE_URL}/api/client/ads/${adId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(adData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to update advertisement");
+  }
+
+  return data;
+}
+
+export async function deleteClientAd(token, adId) {
+  const response = await fetch(`${API_BASE_URL}/api/client/ads/${adId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to delete advertisement");
+  }
+
+  return data;
+}
+export async function uploadClientAdMedia(token, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/client/media/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to upload advertisement media");
+  }
+
+  return data;
+}

@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   clientLogin,
   getClientProfile,
   getClientUsers,
   getClientLoginLogs,
   getClientLiveUsers,
+  getClientAds,
+  createClientAd,
+  updateClientAd,
+  deleteClientAd,
+  uploadClientAdMedia,
   updateClientUserStatus,
 } from "./api";
 import "./App.css";
@@ -31,6 +36,26 @@ export default function App() {
   const [liveUsers, setLiveUsers] = useState([]);
   const [liveUsersLoading, setLiveUsersLoading] = useState(false);
   const [liveUsersError, setLiveUsersError] = useState("");
+  const [ads, setAds] = useState([]);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [adsError, setAdsError] = useState("");
+  const [editingAd, setEditingAd] = useState(null);
+  const [savingAd, setSavingAd] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [deletingAdId, setDeletingAdId] = useState(null);
+  const [adForm, setAdForm] = useState({
+    name: "",
+    mediaType: "IMAGE",
+    mediaUrl: "",
+    placement: "FULLSCREEN",
+    targetDevice: "BOTH",
+    durationSeconds: 10,
+    repeatIntervalSeconds: 60,
+    isActive: true,
+    skippable: false,
+    skipAfterSeconds: 0,
+    closable: true,
+  });
 
   useEffect(() => {
     if (!token) {
@@ -135,6 +160,129 @@ export default function App() {
       setLiveUsersError(err.message);
     } finally {
       setLiveUsersLoading(false);
+    }
+  }
+  async function openAdvertisements() {
+    setPage("advertisements");
+    setAdsLoading(true);
+    setAdsError("");
+
+    try {
+      const data = await getClientAds(token);
+      setAds(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setAdsError(err.message);
+    } finally {
+      setAdsLoading(false);
+    }
+  }
+  async function handleAdMediaUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingMedia(true);
+    setAdsError("");
+
+    try {
+      const data = await uploadClientAdMedia(token, file);
+      setAdForm((current) => ({
+        ...current,
+        mediaUrl: data.url,
+        mediaType: data.mediaType || current.mediaType,
+      }));
+    } catch (err) {
+      setAdsError(err.message);
+    } finally {
+      setUploadingMedia(false);
+      event.target.value = "";
+    }
+  }
+  function handleAdFormChange(event) {
+    const { name, value, type, checked } = event.target;
+    setAdForm((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
+  function resetAdForm() {
+    setEditingAd(null);
+    setAdForm({
+      name: "",
+      mediaType: "IMAGE",
+      mediaUrl: "",
+      placement: "FULLSCREEN",
+      targetDevice: "BOTH",
+      durationSeconds: 10,
+      repeatIntervalSeconds: 60,
+      isActive: true,
+      skippable: false,
+      skipAfterSeconds: 0,
+      closable: true,
+    });
+  }
+
+  async function handleSaveAd(event) {
+    event.preventDefault();
+    setSavingAd(true);
+    setAdsError("");
+
+    const payload = {
+      ...adForm,
+      durationSeconds: Number(adForm.durationSeconds) || 10,
+      repeatIntervalSeconds: Number(adForm.repeatIntervalSeconds) || 60,
+      skipAfterSeconds: Number(adForm.skipAfterSeconds) || 0,
+    };
+
+    try {
+      if (editingAd) {
+        await updateClientAd(token, editingAd.id, payload);
+      } else {
+        await createClientAd(token, payload);
+      }
+
+      resetAdForm();
+      const data = await getClientAds(token);
+      setAds(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setAdsError(err.message);
+    } finally {
+      setSavingAd(false);
+    }
+  }
+
+  function handleEditAd(ad) {
+    setEditingAd(ad);
+    setAdsError("");
+    setAdForm({
+      name: ad.name || "",
+      mediaType: ad.media_type || "IMAGE",
+      mediaUrl: ad.media_url || "",
+      placement: ad.placement || "FULLSCREEN",
+      targetDevice: ad.target_device || "BOTH",
+      durationSeconds: ad.duration_seconds || 10,
+      repeatIntervalSeconds: ad.repeat_interval_seconds || 60,
+      isActive: ad.is_active !== false,
+      skippable: Boolean(ad.skippable),
+      skipAfterSeconds: ad.skip_after_seconds || 0,
+      closable: ad.closable !== false,
+    });
+  }
+
+  async function handleDeleteAd(ad) {
+    if (!window.confirm(`Delete advertisement "${ad.name}"?`)) return;
+
+    setDeletingAdId(ad.id);
+    setAdsError("");
+
+    try {
+      await deleteClientAd(token, ad.id);
+      setAds((current) => current.filter((item) => item.id !== ad.id));
+      if (editingAd?.id === ad.id) resetAdForm();
+    } catch (err) {
+      setAdsError(err.message);
+    } finally {
+      setDeletingAdId(null);
     }
   }
   async function handleUserStatus(user) {
@@ -245,7 +393,12 @@ export default function App() {
           >
             Live Users
           </button>
-          <button disabled>Advertisements</button>
+          <button
+            className={page === "advertisements" ? "nav-active" : ""}
+            onClick={openAdvertisements}
+          >
+            Advertisements
+          </button>
         </nav>
 
         <button className="logout-button" onClick={handleLogout}>
@@ -509,7 +662,155 @@ export default function App() {
             </section>
           </>
         )}
+        {page === "advertisements" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <h1>Advertisements</h1>
+                <p>Manage advertisements for {profile.tenant_name}.</p>
+              </div>
+              <span className="status-badge">{ads.length} Ads</span>
+            </header>
+
+            {adsError && <div className="error-box">{adsError}</div>}
+
+            <section className="content-card">
+              <h2>{editingAd ? "Edit Advertisement" : "Create Advertisement"}</h2>
+
+              <form onSubmit={handleSaveAd}>
+                <div className="form-grid">
+                  <label>
+                    Ad Name
+                    <input name="name" value={adForm.name} onChange={handleAdFormChange} required />
+                  </label>
+
+                  <label>
+                    Image / Video
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+                      onChange={handleAdMediaUpload}
+                      disabled={uploadingMedia}
+                    />
+                    <small>
+                      {uploadingMedia
+                        ? "Uploading..."
+                        : adForm.mediaUrl
+                          ? `${adForm.mediaType} uploaded`
+                          : "Upload advertisement media"}
+                    </small>
+                  </label>
+
+                  <label>
+                    Placement
+                    <select name="placement" value={adForm.placement} onChange={handleAdFormChange}>
+                      <option value="FULLSCREEN">Fullscreen</option>
+                      <option value="TOP">Top</option>
+                      <option value="BOTTOM">Bottom</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Device
+                    <select name="targetDevice" value={adForm.targetDevice} onChange={handleAdFormChange}>
+                      <option value="BOTH">Mobile + TV</option>
+                      <option value="MOBILE">Mobile</option>
+                      <option value="TV">TV</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Duration (seconds)
+                    <input
+                      type="number"
+                      min="1"
+                      name="durationSeconds"
+                      value={adForm.durationSeconds}
+                      onChange={handleAdFormChange}
+                    />
+                  </label>
+                </div>
+
+                <div className="checkbox-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="isActive"
+                      checked={adForm.isActive}
+                      onChange={handleAdFormChange}
+                    />
+                    Active
+                  </label>
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" disabled={savingAd || uploadingMedia || !adForm.mediaUrl}>
+                    {savingAd ? "Saving..." : editingAd ? "Update Advertisement" : "Create Advertisement"}
+                  </button>
+
+                  {editingAd && (
+                    <button type="button" onClick={resetAdForm}>Cancel Edit</button>
+                  )}
+                </div>
+              </form>
+            </section>
+
+            <section className="content-card">
+              <h2>Existing Advertisements</h2>
+
+              {adsLoading ? (
+                <p>Loading advertisements...</p>
+              ) : ads.length === 0 ? (
+                <p>No advertisements found.</p>
+              ) : (
+                <div className="users-table-wrap">
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Placement</th>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ads.map((ad) => (
+                        <tr key={ad.id}>
+                          <td>{ad.name}</td>
+                          <td>{ad.media_type}</td>
+                          <td>{ad.placement}</td>
+                          <td>{ad.target_device}</td>
+                          <td>{ad.is_active ? "Active" : "Inactive"}</td>
+                          <td>
+                            <button type="button" onClick={() => handleEditAd(ad)}>Edit</button>{" "}
+                            <button
+                              type="button"
+                              disabled={deletingAdId === ad.id}
+                              onClick={() => handleDeleteAd(ad)}
+                            >
+                              {deletingAdId === ad.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
 }
+
+
+
+
+
+
+
+
