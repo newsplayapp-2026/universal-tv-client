@@ -4,6 +4,7 @@ import {
   getClientProfile,
   getClientUsers,
   getClientLoginLogs,
+  getClientLiveUsers,
   updateClientUserStatus,
 } from "./api";
 import "./App.css";
@@ -27,6 +28,9 @@ export default function App() {
   const [loginLogs, setLoginLogs] = useState([]);
   const [loginLogsLoading, setLoginLogsLoading] = useState(false);
   const [loginLogsError, setLoginLogsError] = useState("");
+  const [liveUsers, setLiveUsers] = useState([]);
+  const [liveUsersLoading, setLiveUsersLoading] = useState(false);
+  const [liveUsersError, setLiveUsersError] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -44,6 +48,23 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [token]);
 
+  useEffect(() => {
+    if (page !== "live-users" || !token) {
+      return;
+    }
+
+    const liveUsersInterval = setInterval(async () => {
+      try {
+        const data = await getClientLiveUsers(token);
+        setLiveUsers(data.users || []);
+        setLiveUsersError("");
+      } catch (err) {
+        setLiveUsersError(err.message);
+      }
+    }, 15_000);
+
+    return () => clearInterval(liveUsersInterval);
+  }, [page, token]);
   async function handleLogin(event) {
     event.preventDefault();
     setLoading(true);
@@ -100,6 +121,20 @@ export default function App() {
       setLoginLogsError(err.message);
     } finally {
       setLoginLogsLoading(false);
+    }
+  }
+  async function openLiveUsers() {
+    setPage("live-users");
+    setLiveUsersLoading(true);
+    setLiveUsersError("");
+
+    try {
+      const data = await getClientLiveUsers(token);
+      setLiveUsers(data.users || []);
+    } catch (err) {
+      setLiveUsersError(err.message);
+    } finally {
+      setLiveUsersLoading(false);
     }
   }
   async function handleUserStatus(user) {
@@ -204,7 +239,12 @@ export default function App() {
           >
             Login Logs
           </button>
-          <button disabled>Live Users</button>
+          <button
+            className={page === "live-users" ? "nav-active" : ""}
+            onClick={openLiveUsers}
+          >
+            Live Users
+          </button>
           <button disabled>Advertisements</button>
         </nav>
 
@@ -401,6 +441,65 @@ export default function App() {
                           <td>{log.email || "-"}</td>
                           <td>{log.ip_address || "-"}</td>
                           <td>{log.user_agent || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+        {page === "live-users" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <h1>Live Users</h1>
+                <p>Users currently active in {profile.tenant_name}.</p>
+              </div>
+
+              <span className="status-badge">
+                {liveUsers.length} Online
+              </span>
+            </header>
+
+            {liveUsersError && (
+              <div className="error-box">{liveUsersError}</div>
+            )}
+
+            <section className="content-card">
+              {liveUsersLoading ? (
+                <p>Loading live users...</p>
+              ) : liveUsers.length === 0 ? (
+                <p>No users are currently online.</p>
+              ) : (
+                <div className="users-table-wrap">
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Mobile</th>
+                        <th>Email</th>
+                        <th>Last Seen</th>
+                        <th>Last Login</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td>{user.name || "-"}</td>
+                          <td>{user.mobile_number || "-"}</td>
+                          <td>{user.email || "-"}</td>
+                          <td>
+                            {user.last_seen_at
+                              ? new Date(user.last_seen_at).toLocaleString()
+                              : "-"}
+                          </td>
+                          <td>
+                            {user.last_login_at
+                              ? new Date(user.last_login_at).toLocaleString()
+                              : "Never"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

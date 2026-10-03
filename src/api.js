@@ -87,3 +87,18 @@ export async function getClientLoginLogs(token) {
 
   return data;
 }
+export async function getClientLiveUsers(token) {
+  const response = await fetch(`${API_BASE_URL}/api/client/live-users`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to load live users");
+  }
+
+  return data;
+}
