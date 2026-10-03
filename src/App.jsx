@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { clientLogin, getClientProfile } from "./api";
+import {
+  clientLogin,
+  getClientProfile,
+  getClientUsers,
+  updateClientUserStatus,
+} from "./api";
 import "./App.css";
 
 const TOKEN_KEY = "universal_tv_client_token";
@@ -13,6 +18,11 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState("");
+  const [page, setPage] = useState("dashboard");
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [updatingUserId, setUpdatingUserId] = useState(null);
 
   useEffect(() => {
     if (!token) {
@@ -55,6 +65,46 @@ export default function App() {
     setEmail("");
     setPassword("");
     setError("");
+    setPage("dashboard");
+    setUsers([]);
+  }
+
+  async function openUsers() {
+    setPage("users");
+    setUsersLoading(true);
+    setUsersError("");
+
+    try {
+      const data = await getClientUsers(token);
+      setUsers(data);
+    } catch (err) {
+      setUsersError(err.message);
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  async function handleUserStatus(user) {
+    setUpdatingUserId(user.id);
+    setUsersError("");
+
+    try {
+      const updated = await updateClientUserStatus(
+        token,
+        user.id,
+        !user.is_active
+      );
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === updated.id ? updated : item
+        )
+      );
+    } catch (err) {
+      setUsersError(err.message);
+    } finally {
+      setUpdatingUserId(null);
+    }
   }
 
   if (loading && !profile) {
@@ -116,8 +166,20 @@ export default function App() {
         </div>
 
         <nav>
-          <button className="nav-active">Dashboard</button>
-          <button disabled>Users</button>
+          <button
+            className={page === "dashboard" ? "nav-active" : ""}
+            onClick={() => setPage("dashboard")}
+          >
+            Dashboard
+          </button>
+
+          <button
+            className={page === "users" ? "nav-active" : ""}
+            onClick={openUsers}
+          >
+            Users
+          </button>
+
           <button disabled>Login Logs</button>
           <button disabled>Live Users</button>
           <button disabled>Advertisements</button>
@@ -129,54 +191,145 @@ export default function App() {
       </aside>
 
       <main className="dashboard">
-        <header className="dashboard-header">
-          <div>
-            <h1>Dashboard</h1>
-            <p>
-              Welcome, {profile.name}. This panel is restricted to your tenant.
-            </p>
-          </div>
+        {page === "dashboard" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <h1>Dashboard</h1>
+                <p>
+                  Welcome, {profile.name}. This panel is restricted to your tenant.
+                </p>
+              </div>
 
-          <span className="status-badge">
-            {profile.is_active ? "Panel Active" : "Panel Blocked"}
-          </span>
-        </header>
+              <span className="status-badge">
+                {profile.is_active ? "Panel Active" : "Panel Blocked"}
+              </span>
+            </header>
 
-        <section className="dashboard-grid">
-          <article className="stat-card">
-            <span>Tenant</span>
-            <strong>{profile.tenant_name}</strong>
-          </article>
+            <section className="dashboard-grid">
+              <article className="stat-card">
+                <span>Tenant</span>
+                <strong>{profile.tenant_name}</strong>
+              </article>
 
-          <article className="stat-card">
-            <span>Account</span>
-            <strong>{profile.email}</strong>
-          </article>
+              <article className="stat-card">
+                <span>Account</span>
+                <strong>{profile.email}</strong>
+              </article>
 
-          <article className="stat-card">
-            <span>App Status</span>
-            <strong>
-              {profile.tenant_is_active ? "Active" : "Inactive"}
-            </strong>
-          </article>
+              <article className="stat-card">
+                <span>App Status</span>
+                <strong>
+                  {profile.tenant_is_active ? "Active" : "Inactive"}
+                </strong>
+              </article>
 
-          <article className="stat-card">
-            <span>Last Login</span>
-            <strong>
-              {profile.last_login_at
-                ? new Date(profile.last_login_at).toLocaleString()
-                : "Current session"}
-            </strong>
-          </article>
-        </section>
+              <article className="stat-card">
+                <span>Last Login</span>
+                <strong>
+                  {profile.last_login_at
+                    ? new Date(profile.last_login_at).toLocaleString()
+                    : "Current session"}
+                </strong>
+              </article>
+            </section>
 
-        <section className="content-card">
-          <h2>Client Panel Ready</h2>
-          <p>
-            User management, login logs, live users and advertisements
-            will be connected here in the next phases.
-          </p>
-        </section>
+            <section className="content-card">
+              <h2>Client Panel</h2>
+              <p>
+                Manage your application users from the Users section.
+                Login logs, live users and advertisements will be connected next.
+              </p>
+            </section>
+          </>
+        )}
+
+        {page === "users" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <h1>App Users</h1>
+                <p>
+                  Manage users registered with {profile.tenant_name}.
+                </p>
+              </div>
+
+              <span className="status-badge">
+                {users.length} Users
+              </span>
+            </header>
+
+            {usersError && (
+              <div className="error-box">{usersError}</div>
+            )}
+
+            <section className="content-card">
+              {usersLoading ? (
+                <p>Loading users...</p>
+              ) : users.length === 0 ? (
+                <p>No users found.</p>
+              ) : (
+                <div className="users-table-wrap">
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Mobile</th>
+                        <th>Email</th>
+                        <th>Last Login</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id}>
+                          <td>{user.name || "-"}</td>
+                          <td>{user.mobile_number || "-"}</td>
+                          <td>{user.email || "-"}</td>
+                          <td>
+                            {user.last_login_at
+                              ? new Date(user.last_login_at).toLocaleString()
+                              : "Never"}
+                          </td>
+                          <td>
+                            <span
+                              className={
+                                user.is_active
+                                  ? "user-status active"
+                                  : "user-status blocked"
+                              }
+                            >
+                              {user.is_active ? "Active" : "Blocked"}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className={
+                                user.is_active
+                                  ? "user-action danger"
+                                  : "user-action success"
+                              }
+                              disabled={updatingUserId === user.id}
+                              onClick={() => handleUserStatus(user)}
+                            >
+                              {updatingUserId === user.id
+                                ? "Updating..."
+                                : user.is_active
+                                  ? "Block"
+                                  : "Activate"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
     </div>
   );

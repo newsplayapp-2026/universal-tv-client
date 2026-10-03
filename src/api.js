@@ -33,3 +33,41 @@ export async function getClientProfile(token) {
 
   return data;
 }
+
+export async function getClientUsers(token) {
+  const response = await fetch(`${API_BASE_URL}/api/client/users`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to load users");
+  }
+
+  return data;
+}
+
+export async function updateClientUserStatus(token, userId, isActive) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/client/users/${userId}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ isActive }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to update user status");
+  }
+
+  return data;
+}

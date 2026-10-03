@@ -262,3 +262,81 @@ input {
     padding: 24px;
   }
 }
+
+/* App Users */
+.users-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.users-table th,
+.users-table td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e6eaf0;
+  vertical-align: middle;
+}
+
+.users-table th {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f8fafc;
+}
+
+.users-table td {
+  font-size: 14px;
+}
+
+.users-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.user-status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user-status.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.user-status.blocked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.user-action {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.user-action.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.user-action.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.user-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
